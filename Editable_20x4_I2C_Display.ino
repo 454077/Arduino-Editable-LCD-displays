@@ -17,9 +17,10 @@ String text[MAX_LINES] = {
   "This is a display.",
   "And it is super cool!"
 };  // Pre-allocate array
+String displayedText[3] = {text[0], text[1], text[2]};
 int numLines = 4;// Track actual lines used
-String line0 = text[0], line1 = text[1], line2 = text[2], currentLine = line0, cursorDir = "up";
-int cursorIDX[2] = {0, 0}, textStart[3] = {0, 0, 0}, textEnd[3] = {line0.length(), line1.length(), line2.length()}, charIndex = 0, lineNum = 0, firstLine = 0, lastLine = 3;
+String currentLine = text[0],cursorDir = "down";
+int cursorIDX[2] = {0, 0}, textStart[3] = {0, 0, 0}, textEnd[3] = {text[0].length(), text[1].length(), text[2].length()}, charIndex = 0, lineNum = 0, firstLine = 0, lastLine = 2;
 char currentChar = 'a';
 bool cursorTouch = true;
 
@@ -120,8 +121,23 @@ void lcdPrint(String str) {
   }
 }
 
+void displayToSerial() {
+  unsigned int minutes = floor(millis() / 60000);
+  int seconds = int(floor(millis()/1000)) % 60, milliseconds = millis() % 1000;
+  Serial.print("\033[H\033[2J");  // Clear terminal
+  Serial.flush();
+  for (int i = 0; i < 5; i++) Serial.println(" ");
+  Serial.println("Line Editor Status:");
+  Serial.println("Current Time: " + String(minutes) + ":" + String(seconds) + "." + String(milliseconds));
+  Serial.println("Line " + String(lineNum) + ": " + currentLine);
+  Serial.println("Cursor: [" + String(cursorIDX[0]) + "," + String(cursorIDX[1]) + "]");
+  Serial.println("Current Char: " + String(currentChar));
+  Serial.println("Line range: [" + String(firstLine) + "," + String(lastLine) + "]");
+}
+
 void setup() {
   Wire.begin(); //init.begin();
+  Serial.begin(9600);
   int status = lcd.begin(20,4);
   /*
   byte* customChars[] = {cursorUpTouch, cursorUpNoTouch, cursorDownTouch, cursorDownNoTouch, textCont, backSlash};
@@ -164,7 +180,7 @@ void loop() {
   
   // Handle button presses with debounce
   if (currentTime - lastDebounceTime > debounceDelay - dispDebounce) {
-
+    displayToSerial();
     if ((digitalRead(Left) == LOW) || (digitalRead(Right) == LOW) ||
         (digitalRead(Up) == LOW) || (digitalRead(Down) == LOW) ||
         (digitalRead(AddChar) == LOW) || (digitalRead(BackSp) == LOW) ||
@@ -261,9 +277,10 @@ void loop() {
     
     //Previous line; Move cursor up
     if ((digitalRead(PrevLn) == LOW) && (numLines > 0)){
+      cursorDir = "up";
       lineNum = (lineNum - 1 + numLines) % numLines;
       currentLine = text[lineNum];
-      if (cursorIDX[1] > 0) {
+      if (cursorIDX[1] + firstLine > 0) {
         cursorIDX[1]--;
       }else if (firstLine == 0){//wrap around
         cursorIDX[1] = constrain(cursorIDX[1], 0, 3);
@@ -276,9 +293,10 @@ void loop() {
     
     //Next line; Move cursor down
     if ((digitalRead(NextLn) == LOW) && (numLines > 0)){
+      cursorDir = "down";
       lineNum = (lineNum + 1) % numLines;
       currentLine = text[lineNum];
-      if ((cursorIDX[1] < 3) && (cursorIDX[1] < numLines - 1)){
+      if ((cursorIDX[1] + lastLine < 3) && (cursorIDX[1] + lastLine < numLines - 1)){
         cursorIDX[1]++;
       }else if (lastLine == numLines -1){//wrap around
         cursorIDX[1] = 0;
@@ -325,11 +343,11 @@ if (digitalRead(DelLn) == LOW){
   }
   
   // Display text
-  String displayedText[3] = {line0, line1, line2};
   String Line = "";
   lcd.setCursor(0, 0);
-  for (int i = 0, j = 0; i < 3; i++) {
-    if (i == cursorIDX[1]){
+  for (int i = 0, j = 0; i < min(numLines, 3); i++) {
+    displayedText[i] = text[(firstLine > 0 ? lineNum : 0) + i];
+    if (i == cursorIDX[1] + (cursorDir == "up" ? 1 : 0)){
       // Display cursor indicator
       lcd.setCursor(cursorIDX[0], i);
       if(cursorTouch){
