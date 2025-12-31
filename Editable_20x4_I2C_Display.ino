@@ -19,7 +19,7 @@ String text[MAX_LINES] = {
 };  // Pre-allocate array
 int numLines = 4;// Track actual lines used
 String line0 = text[0], line1 = text[1], line2 = text[2], currentLine = line0, cursorDir = "up";
-int cursorIDX[2] = {0, 0}, charIndex = 0, lineNum = 0, textStart = 0, textEnd = currentLine.length(), firstLine = 0, lastLine = 3;
+int cursorIDX[2] = {0, 0}, textStart[3] = {0, 0, 0}, textEnd[3] = {line0.length(), line1.length(), line2.length()}, charIndex = 0, lineNum = 0, firstLine = 0, lastLine = 3;
 char currentChar = 'a';
 bool cursorTouch = true;
 
@@ -123,18 +123,20 @@ void lcdPrint(String str) {
 void setup() {
   Wire.begin(); //init.begin();
   int status = lcd.begin(20,4);
+  /*
   byte* customChars[] = {cursorUpTouch, cursorUpNoTouch, cursorDownTouch, cursorDownNoTouch, textCont, backSlash};
   for (int i = 0, len = sizeof(customChars); i < len; i++) {
     lcd.createChar(i, customChars[i]);
   }
-  /*
-    lcd.createChar(0, cursorUpTouch);//create a new character
+  */
+  
+  lcd.createChar(0, cursorUpTouch);//create a new character
   lcd.createChar(1, cursorUpNoTouch);//create a new character
   lcd.createChar(2, cursorDownTouch);//create a new character
   lcd.createChar(3, cursorDownNoTouch);//create a new character
   lcd.createChar(4, textCont);//create a new character
   lcd.createChar(5, backSlash);//create custom backslash
-  */
+  
   lcd.begin(20,4);//LCD is 20 chars long and 4 chars wide
   for (int i = 2; i < 12; i++){
     pinMode(i, INPUT_PULLUP);
@@ -151,12 +153,12 @@ void loop() {
   lineNum = constrain(lineNum, 0, numLines);
   
   if (currentLine.length() > 20){
-    textStart = constrain(textStart, 0, currentLine.length() - 16);
-    textEnd = textStart + 19;
+    textStart[lineNum] = constrain(textStart[lineNum], 0, currentLine.length() - 16);
+    textEnd[lineNum] = textStart[lineNum] + 19;
     cursorIDX[0] = constrain(cursorIDX[0], 0, 19);
   }else{
-    textStart = 0;
-    textEnd = currentLine.length()-1;
+    textStart[lineNum] = 0;
+    textEnd[lineNum] = currentLine.length()-1;
     cursorIDX[0] = constrain(cursorIDX[0], 0, currentLine.length()-1);
   }
   
@@ -176,7 +178,7 @@ void loop() {
       }
       
       if (currentLine.length() > 0){
-        currentChar = currentLine.charAt(cursorIDX[1] + textStart);
+        currentChar = currentLine.charAt(cursorIDX[1] + textStart[lineNum]);
         charIndex = indexOf(currentChar);
       }
     }
@@ -187,11 +189,11 @@ void loop() {
     if ((digitalRead(Left) == LOW) && (currentLine.length() > 0)){
       if (cursorIDX[0] > 0) {
         cursorIDX[0]--;
-      }else if (textStart == 0){//wrap around
+      }else if (textStart[lineNum] == 0){//wrap around
         cursorIDX[0] = constrain(cursorIDX[0], currentLine.length() - 1, 19);
-        textStart = currentLine.length() - 20;
+        textStart[lineNum] = currentLine.length() - 20;
       }else{
-        textStart--;
+        textStart[lineNum]--;
       }
     }
     
@@ -200,25 +202,25 @@ void loop() {
     ((digitalRead(AddChar) == LOW) && (currentLine.length() > 19)) ){
       if ((cursorIDX[0] < 19) && (cursorIDX[0] < currentLine.length() - 1)){
         cursorIDX[0]++;
-      }else if (textEnd == currentLine.length() -1){//wrap around
+      }else if (textEnd[lineNum] == currentLine.length() -1){//wrap around
         cursorIDX[0] = 0;
-        textStart = 0;
+        textStart[lineNum] = 0;
       }else{
-        textStart++;
+        textStart[lineNum]++;
       }
     }
 
     // Change character (up)
     if (digitalRead(Up) == LOW) {
       charIndex = (charIndex + 1) % sizeof(ASCII);
-      currentLine.setCharAt(cursorIDX[0] + textStart, ASCII[charIndex]);
+      currentLine.setCharAt(cursorIDX[0] + textStart[lineNum], ASCII[charIndex]);
       text[lineNum] = currentLine;
     }
     
     // Change character (down)
     if (digitalRead(Down) == LOW) {
       charIndex = (charIndex - 1 + sizeof(ASCII)) % sizeof(ASCII);
-      currentLine.setCharAt(cursorIDX[0] + textStart, ASCII[charIndex]);
+      currentLine.setCharAt(cursorIDX[0] + textStart[lineNum], ASCII[charIndex]);
       text[lineNum] = currentLine;
     }
     
@@ -226,33 +228,33 @@ void loop() {
     if (digitalRead(AddChar) == LOW){
       currentLine = currentLine + " ";
       if (currentLine.length() > 20){
-        textStart = currentLine.length() - 19;
+        textStart[lineNum] = currentLine.length() - 19;
         cursorIDX[0] = 19;
       }
       cursorIDX[0] = constrain(cursorIDX[0], currentLine.length() - 1, 19);
-      textStart = constrain(textStart, 0, currentLine.length() - 20);
+      textStart[lineNum] = constrain(textStart[lineNum], 0, currentLine.length() - 20);
       text[lineNum] = currentLine;
     }
     
     //Remove character at cursor
     if (digitalRead(BackSp) == LOW){
       if (currentLine.length() > 0){
-        if (cursorIDX[0] + textStart == 0){
+        if (cursorIDX[0] + textStart[lineNum] == 0){
           currentLine = currentLine.substring(1, currentLine.length());
-        }else if (cursorIDX[0] + textStart == currentLine.length() - 1){
+        }else if (cursorIDX[0] + textStart[lineNum] == currentLine.length() - 1){
           currentLine = currentLine.substring(0, currentLine.length() - 1);
           cursorIDX[0] = constrain(cursorIDX[0], currentLine.length() - 1, 19);
           if (currentLine.length() > 20){
-            textStart--;
+            textStart[lineNum]--;
             cursorIDX[0] = 19;
           }
         }else{
-          currentLine = currentLine.substring(0, cursorIDX[0] + textStart) +
-            currentLine.substring(cursorIDX[0] + textStart + 1, currentLine.length());
+          currentLine = currentLine.substring(0, cursorIDX[0] + textStart[lineNum]) +
+            currentLine.substring(cursorIDX[0] + textStart[lineNum] + 1, currentLine.length());
         }
       }
       if (currentLine.length() < 2){
-        textStart = 0;
+        textStart[lineNum] = 0;
       }
       text[lineNum] = currentLine;
     }
@@ -299,7 +301,7 @@ if (digitalRead(AddLn) == LOW){
     lineNum++;  // Move to new line
     currentLine = text[lineNum];
     cursorIDX[0] = 0;
-    textStart = 0;
+    textStart[lineNum] = 0;
   }
 }
     //Delete current line
@@ -312,7 +314,7 @@ if (digitalRead(DelLn) == LOW){
   lineNum = constrain(lineNum, 0, numLines - 1);
   currentLine = text[lineNum];
   cursorIDX[0] = 0;
-  textStart = 0;
+  textStart[lineNum] = 0;
 }
     
     lastDebounceTime = currentTime;
@@ -327,10 +329,9 @@ if (digitalRead(DelLn) == LOW){
   String Line = "";
   lcd.setCursor(0, 0);
   for (int i = 0, j = 0; i < 3; i++) {
-     
     if (i == cursorIDX[1]){
       // Display cursor indicator
-      lcd.setCursor(cursorIDX[0], 1);
+      lcd.setCursor(cursorIDX[0], i);
       if(cursorTouch){
         if (currentLine.length() > 0){
           lcd.write(byte(cursorDir == "down" ? 2 : 0));
@@ -350,19 +351,20 @@ if (digitalRead(DelLn) == LOW){
         }
       }
       j++;
-    }else{
-      j++;
-      lcdPrint(Line.substring(textStart, textEnd + 1));
-      if (textStart > 0){
-        lcd.setCursor(0, 0);
-        lcd.write(byte(4));
-      }//print "..."
-      
-      if ((textEnd < Line.length() - 1) && (Line.length() > 19)){
-        lcd.setCursor(19, j);
-        lcd.write(byte(4));
-      }// print "..."
     }
+    j++;
+    Line = displayedText[i];
+    lcd.setCursor(0, j-1);
+    lcdPrint(Line.substring(textStart[i], textEnd[i] + 1));
+    if (textStart[i] > 0){
+      lcd.setCursor(0, j-1);
+      lcd.write(byte(4));
+    }//print "..."
+    
+    if ((textEnd[i] < Line.length() - 1) && (Line.length() > 19)){
+      lcd.setCursor(19, j-1);
+      lcd.write(byte(4));
+    }// print "..."
   }
   delay(dispDebounce); // Small delay to prevent display flickering
 }
